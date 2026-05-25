@@ -254,8 +254,6 @@ function summaryHtml(page, rows) {
   let totalVat = 0;
   let totalProfit = 0;
   let totalInvoice = 0;
-  let totalReceivable = 0;
-let totalDebt = 0;
 
   rows.forEach(r => {
     const c = calculate(r);
@@ -265,21 +263,6 @@ let totalDebt = 0;
     totalVat += Number(c.kdv_farki || 0);
     totalProfit += Number(c.kar || 0);
     totalInvoice += Number(c.kdv_dahil_toplam || 0);
-    if (
-  page !== "gelen" &&
-  ["Bekleniyor", "Kısmi Ödeme"].includes(r.odeme_durumu)
-) {
-  totalReceivable += Number(
-    r.toplam_satis || c.kdv_dahil_toplam || 0
-  );
-}
-
-if (
-  page === "gelen" &&
-  r.odeme_durumu === "Ödenmedi"
-) {
-  totalDebt += Number(c.kdv_dahil_toplam || 0);
-}
   });
 
   const items = page === "gelen"
@@ -295,9 +278,6 @@ if (
         ["Toplam Kâr", totalProfit],
         ["KDV Farkı", totalVat],
         ["Toplam Kayıt", rows.length]
-      ...(page !== "gelen"
-  ? [["Toplam Alacak", totalReceivable]]
-  : [["Toplam Borç", totalDebt]])
       ];
 
   return `<div class="summary">
