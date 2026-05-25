@@ -440,13 +440,33 @@ async function renderPage(page) {
   const tbody = container.querySelector("tbody");
   const summary = container.querySelector(".summary-wrap");
   const search = container.querySelector(".search");
+  const monthFilter = container.querySelector(".month-filter");
+const paymentFilter = container.querySelector(".payment-filter");
+const onlyUnpaid = container.querySelector(".only-unpaid");
 
   function draw() {
     const q = search.value.toLowerCase().trim();
 
-    const filtered = rows.filter(r =>
-      JSON.stringify(r).toLowerCase().includes(q)
-    );
+    const selectedMonth = monthFilter.value;
+const selectedPayment = paymentFilter.value;
+const showOnlyUnpaid = onlyUnpaid.checked;
+
+const filtered = rows.filter(r => {
+  const textMatch = JSON.stringify(r).toLowerCase().includes(q);
+
+  const rowMonth = r.tarih ? r.tarih.slice(5, 7) : "";
+  const monthMatch = !selectedMonth || rowMonth === selectedMonth;
+
+  const paymentMatch = !selectedPayment || r.odeme_durumu === selectedPayment;
+
+  const unpaidMatch =
+    !showOnlyUnpaid ||
+    r.odeme_durumu === "Bekleniyor" ||
+    r.odeme_durumu === "Ödenmedi" ||
+    r.odeme_durumu === "Kısmi Ödeme";
+
+  return textMatch && monthMatch && paymentMatch && unpaidMatch;
+});
 
     tbody.innerHTML = filtered.map(row => `
       <tr>
@@ -469,6 +489,9 @@ async function renderPage(page) {
   container.querySelector(".close-btn").onclick = () => closeModal(container);
   container.querySelector(".export-btn").onclick = () => exportCsv(config, rows);
   search.oninput = draw;
+  monthFilter.onchange = draw;
+paymentFilter.onchange = draw;
+onlyUnpaid.onchange = draw;
 
   container.querySelector(".save-btn").onclick = async () => {
     const obj = getFormValues(container, config);
