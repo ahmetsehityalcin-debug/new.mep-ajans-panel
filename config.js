@@ -1,4 +1,2 @@
-// Supabase bağlantısı buraya yazılacak.
-// Şimdilik boş kalırsa veriler aynı cihazda localStorage'a kaydedilir.
-window.MEP_SUPABASE_URL = "";
-window.MEP_SUPABASE_ANON_KEY = "";
+window.MEP_SUPABASE_URL = "https://zpdywuczxpbaezqdzbmc.supabase.co";
+window.MEP_SUPABASE_ANON_KEY = "sb_publishable_tdBaWsLJ3SoP-O9JK3hh3g_rZiBwV27";
