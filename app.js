@@ -254,6 +254,79 @@ function summaryHtml(page, rows) {
   let totalVat = 0;
   let totalProfit = 0;
   let totalInvoice = 0;
+  let totalReceivable = 0;
+  let totalDebt = 0;
+
+  rows.forEach(r => {
+    const c = calculate(r);
+
+    totalCost += Number(r.toplam_maliyet || r.toplam_tutar || 0);
+    totalSale += Number(r.toplam_satis || 0);
+    totalVat += Number(c.kdv_farki || 0);
+    totalProfit += Number(c.kar || 0);
+    totalInvoice += Number(c.kdv_dahil_toplam || 0);
+
+    const unpaid =
+      r.odeme_durumu === "Bekleniyor" ||
+      r.odeme_durumu === "Ödenmedi" ||
+      r.odeme_durumu === "Kısmi Ödeme";
+
+    if (unpaid && page === "faturali") {
+      totalReceivable += Number(c.kdv_dahil_toplam || 0);
+    }
+
+    if (unpaid && page === "faturasiz") {
+      totalReceivable += Number(r.toplam_satis || 0);
+    }
+
+    if (unpaid && page === "gelen") {
+      totalDebt += Number(c.kdv_dahil_toplam || 0);
+    }
+  });
+
+  let items = [];
+
+  if (page === "gelen") {
+    items = [
+      ["Toplam Tutar", totalCost],
+      ["KDV Farkı", totalVat],
+      ["KDV Dahil Toplam", totalInvoice],
+      ["Toplam Borç", totalDebt],
+      ["Toplam Kayıt", rows.length]
+    ];
+  } else if (page === "faturali") {
+    items = [
+      ["Toplam Maliyet", totalCost],
+      ["Toplam Satış", totalSale],
+      ["Toplam Kâr", totalProfit],
+      ["KDV Farkı", totalVat],
+      ["Toplam Alacak", totalReceivable],
+      ["Toplam Kayıt", rows.length]
+    ];
+  } else {
+    items = [
+      ["Toplam Maliyet", totalCost],
+      ["Toplam Satış", totalSale],
+      ["Toplam Kâr", totalProfit],
+      ["Toplam Alacak", totalReceivable],
+      ["Toplam Kayıt", rows.length]
+    ];
+  }
+
+  return `<div class="summary">
+    ${items.map(([label, value]) => `
+      <div class="sum-item">
+        <small>${label}</small>
+        <strong>${label === "Toplam Kayıt" ? value : money(value)}</strong>
+      </div>
+    `).join("")}
+  </div>`;
+}
+  let totalCost = 0;
+  let totalSale = 0;
+  let totalVat = 0;
+  let totalProfit = 0;
+  let totalInvoice = 0;
 
   rows.forEach(r => {
     const c = calculate(r);
@@ -480,7 +553,7 @@ const filtered = rows.filter(r => {
       </tr>
     `).join("");
 
-    summary.innerHTML = summaryHtml(page, rows);
+    summary.innerHTML = summaryHtml(page, filtered);
   }
 
   draw();
