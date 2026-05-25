@@ -1,35 +1,225 @@
-<!doctype html>
+```html
+<!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MEP Ajans Panel</title>
-  <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MEP AJANS PANEL</title>
+
+  <style>
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      background:#f5f5f5;
+      color:#111;
+    }
+
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:20px 30px;
+      background:white;
+      border-bottom:1px solid #e5e5e5;
+    }
+
+    .left{
+      display:flex;
+      align-items:center;
+      gap:20px;
+    }
+
+    .left img{
+      height:70px;
+    }
+
+    .title{
+      font-size:28px;
+      font-weight:700;
+      margin:0;
+    }
+
+    .subtitle{
+      margin-top:5px;
+      color:#777;
+      font-size:14px;
+    }
+
+    .verse{
+      text-align:right;
+      max-width:500px;
+    }
+
+    .verse p{
+      margin:0;
+      font-size:18px;
+      font-weight:600;
+      line-height:1.6;
+    }
+
+    .verse span{
+      font-size:13px;
+      color:#777;
+    }
+
+    .container{
+      padding:30px;
+    }
+
+    .menu{
+      display:flex;
+      gap:15px;
+      margin-bottom:25px;
+    }
+
+    .menu button{
+      border:none;
+      background:#111;
+      color:white;
+      padding:12px 20px;
+      border-radius:10px;
+      cursor:pointer;
+      font-size:14px;
+    }
+
+    .card{
+      background:white;
+      border-radius:15px;
+      padding:20px;
+      box-shadow:0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+    }
+
+    th,td{
+      padding:14px;
+      border-bottom:1px solid #eee;
+      text-align:left;
+      font-size:14px;
+    }
+
+    th{
+      background:#fafafa;
+    }
+
+    .green{
+      background:#d4f8df;
+      color:#118c4f;
+      padding:6px 12px;
+      border-radius:20px;
+      font-size:12px;
+      font-weight:600;
+    }
+
+    .orange{
+      background:#ffe5c2;
+      color:#cc7a00;
+      padding:6px 12px;
+      border-radius:20px;
+      font-size:12px;
+      font-weight:600;
+    }
+
+    .red{
+      background:#ffd6d6;
+      color:#d10000;
+      padding:6px 12px;
+      border-radius:20px;
+      font-size:12px;
+      font-weight:600;
+    }
+  </style>
 </head>
+
 <body>
-  <div class="brand">
-  <img src="./logo.png" style="height:65px;" />
-</div>
-    <div class="quote">Şüphesiz rızık veren, güç ve kuvvet sahibi<br/>olan ancak Allah’tır</div>
-  </header>
 
-  <div class="layout">
-    <aside class="sidebar">
-      <button class="nav active" data-page="faturali">Faturalı Siparişler</button>
-      <button class="nav" data-page="gelen">Gelen Faturalar</button>
-      <button class="nav" data-page="faturasiz">Faturasız Siparişler</button>
-      <div class="userbox">MEP+ AJANS</div>
-    </aside>
+<div class="topbar">
 
-    <main class="content">
-      <section class="page active" id="page-faturali"></section>
-      <section class="page" id="page-gelen"></section>
-      <section class="page" id="page-faturasiz"></section>
-    </main>
+  <div class="left">
+    <img src="./logo.png" />
+
+    <div>
+      <h1 class="title">MEP AJANS PANEL</h1>
+      <div class="subtitle">
+        Sipariş ve fatura takip sistemi
+      </div>
+    </div>
   </div>
 
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+  <div class="verse">
+    <p>
+      “Şüphesiz rızık veren, güç ve kuvvet sahibi olan ancak Allah’tır.”
+    </p>
+
+    <span>
+      Zâriyât Suresi - 58. Ayet
+    </span>
+  </div>
+
+</div>
+
+<div class="container">
+
+  <div class="menu">
+    <button>Faturalı Siparişler</button>
+    <button>Gelen Faturalar</button>
+    <button>Faturasız Siparişler</button>
+  </div>
+
+  <div class="card">
+
+    <table>
+
+      <thead>
+        <tr>
+          <th>Tarih</th>
+          <th>Müşteri</th>
+          <th>Ürün</th>
+          <th>Adet</th>
+          <th>Toplam Satış</th>
+          <th>Kâr</th>
+          <th>Durumu</th>
+          <th>Ödeme</th>
+          <th>Not</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr>
+          <td>25.05.2026</td>
+          <td>ABC Reklam</td>
+          <td>Branda Baskı</td>
+          <td>500</td>
+          <td>₺25.000</td>
+          <td>₺8.000</td>
+
+          <td>
+            <span class="orange">
+              Üretimde
+            </span>
+          </td>
+
+          <td>
+            <span class="green">
+              Ödendi
+            </span>
+          </td>
+
+          <td>
+            Acil teslim
+          </td>
+        </tr>
+      </tbody>
+
+    </table>
+
+  </div>
+
+</div>
+
 </body>
 </html>
+```
