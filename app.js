@@ -376,6 +376,34 @@ async function renderPage(page) {
     <div class="page-head">
       <h1>${config.title}</h1>
       <div class="tools">
+      <select class="month-filter">
+  <option value="">Tüm Aylar</option>
+  <option value="01">Ocak</option>
+  <option value="02">Şubat</option>
+  <option value="03">Mart</option>
+  <option value="04">Nisan</option>
+  <option value="05">Mayıs</option>
+  <option value="06">Haziran</option>
+  <option value="07">Temmuz</option>
+  <option value="08">Ağustos</option>
+  <option value="09">Eylül</option>
+  <option value="10">Ekim</option>
+  <option value="11">Kasım</option>
+  <option value="12">Aralık</option>
+</select>
+
+<select class="payment-filter">
+  <option value="">Tüm Ödemeler</option>
+  <option value="Ödendi">Ödendi</option>
+  <option value="Bekleniyor">Bekleniyor</option>
+  <option value="Ödenmedi">Ödenmedi</option>
+  <option value="Kısmi Ödeme">Kısmi Ödeme</option>
+</select>
+
+<label class="only-unpaid-wrap">
+  <input type="checkbox" class="only-unpaid" />
+  Ödenmeyenleri Göster
+</label>
         <button class="btn btn-red add-btn">+ Yeni Kayıt Ekle</button>
         <button class="btn btn-light export-btn">Excel'e Aktar</button>
         <input class="search" placeholder="Ara..." />
