@@ -2,6 +2,7 @@ const PAGE_CONFIG = {
   faturali: {
     title: "Faturalı Siparişler",
     page: "faturali",
+    nameKey: "musteri",
     fields: [
       ["tarih", "Tarih", "date"],
       ["musteri", "Müşteri Adı", "text"],
@@ -15,12 +16,13 @@ const PAGE_CONFIG = {
       ["fatura_durumu", "Fatura Durumu", "select", ["K", "X"]],
       ["notlar", "Açıklama", "textarea"]
     ],
-    headers: ["Tarih", "Müşteri Adı", "Ürün", "Adet", "Toplam Maliyet", "Toplam Satış", "KDV Farkı", "KDV Dahil Toplam", "Kâr", "Durumu", "Ödeme Durumu", "Fatura Durumu", "Açıklama", "İşlem"]
+    headers: ["Tarih", "Müşteri", "Ürün", "Adet", "Maliyet", "Satış", "KDV", "KDV Dahil", "Kâr", "Durum", "Ödeme", "Fatura", "Not", "İşlem"]
   },
 
   gelen: {
     title: "Gelen Faturalar",
     page: "gelen",
+    nameKey: "firma",
     fields: [
       ["tarih", "Tarih", "date"],
       ["firma", "Firma", "text"],
@@ -32,12 +34,13 @@ const PAGE_CONFIG = {
       ["odeme_durumu", "Ödeme Durumu", "select", ["Ödendi", "Ödenmedi"]],
       ["notlar", "Açıklama / Not", "textarea"]
     ],
-    headers: ["Tarih", "Firma", "Ürün", "Adet", "Toplam Tutar", "KDV Dahil Toplam", "KDV Farkı", "Durumu", "Ödeme Durumu", "Açıklama / Not", "İşlem"]
+    headers: ["Tarih", "Firma", "Ürün", "Adet", "Toplam Tutar", "KDV Dahil", "KDV", "Durum", "Ödeme", "Not", "İşlem"]
   },
 
   faturasiz: {
     title: "Faturasız Siparişler",
     page: "faturasiz",
+    nameKey: "musteri",
     fields: [
       ["tarih", "Tarih", "date"],
       ["musteri", "Müşteri Adı", "text"],
@@ -49,11 +52,16 @@ const PAGE_CONFIG = {
       ["odeme_durumu", "Ödeme Durumu", "select", ["Ödendi", "Bekleniyor", "Kısmi Ödeme"]],
       ["notlar", "Notlar", "textarea"]
     ],
-    headers: ["Tarih", "Müşteri Adı", "Ürün", "Adet", "Toplam Maliyet", "Toplam Satış", "Kâr", "Durumu", "Ödeme Durumu", "Notlar", "İşlem"]
+    headers: ["Tarih", "Müşteri", "Ürün", "Adet", "Maliyet", "Toplam Satış", "Kâr", "Durum", "Ödeme", "Not", "İşlem"]
   }
 };
 
 let supabaseClient = null;
+let PAGE_ROWS = {
+  faturali: [],
+  gelen: [],
+  faturasiz: []
+};
 
 if (window.MEP_SUPABASE_URL && window.MEP_SUPABASE_ANON_KEY && window.supabase) {
   supabaseClient = window.supabase.createClient(
@@ -61,6 +69,12 @@ if (window.MEP_SUPABASE_URL && window.MEP_SUPABASE_ANON_KEY && window.supabase) 
     window.MEP_SUPABASE_ANON_KEY
   );
 }
+
+const MONTHS = [
+  ["01", "Ocak"], ["02", "Şubat"], ["03", "Mart"], ["04", "Nisan"],
+  ["05", "Mayıs"], ["06", "Haziran"], ["07", "Temmuz"], ["08", "Ağustos"],
+  ["09", "Eylül"], ["10", "Ekim"], ["11", "Kasım"], ["12", "Aralık"]
+];
 
 const money = value =>
   Number(value || 0).toLocaleString("tr-TR", {
@@ -70,12 +84,14 @@ const money = value =>
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+const isUnpaid = row =>
+  ["Bekleniyor", "Ödenmedi", "Kısmi Ödeme"].includes(row.odeme_durumu);
+
 function calculate(row) {
   const cost = Number(row.toplam_maliyet || 0);
   const sale = Number(row.toplam_satis || 0);
-  const total = Number(row.toplam_tutar || 0);
-  const base = sale || total;
-
+  const incoming = Number(row.toplam_tutar || 0);
+  const base = sale || incoming;
   const rate = Number(row.kdv_orani || 0);
   const vat = rate ? base * rate / 100 : Number(row.kdv_farki || 0);
 
@@ -119,7 +135,7 @@ async function loadRows(page) {
     .from("kayitlar")
     .select("*")
     .eq("sayfa", page)
-    .order("created_at", { ascending: false });
+    .order("tarih", { ascending: false });
 
   if (error) {
     alert("Veriler alınamadı: " + error.message);
@@ -134,19 +150,11 @@ async function upsertRow(page, row, id = null) {
 
   if (!supabaseClient) {
     const rows = await loadRows(page);
+    const newRows = id
+      ? rows.map(r => r.id === id ? { ...payload, id } : r)
+      : [{ ...payload, id: crypto.randomUUID() }, ...rows];
 
-    if (id) {
-      localStorage.setItem(
-        "mep_" + page,
-        JSON.stringify(rows.map(r => r.id === id ? { ...payload, id } : r))
-      );
-    } else {
-      localStorage.setItem(
-        "mep_" + page,
-        JSON.stringify([{ ...payload, id: crypto.randomUUID() }, ...rows])
-      );
-    }
-
+    localStorage.setItem("mep_" + page, JSON.stringify(newRows));
     return true;
   }
 
@@ -167,17 +175,11 @@ async function deleteRow(page, id) {
 
   if (!supabaseClient) {
     const rows = await loadRows(page);
-    localStorage.setItem(
-      "mep_" + page,
-      JSON.stringify(rows.filter(r => r.id !== id))
-    );
+    localStorage.setItem("mep_" + page, JSON.stringify(rows.filter(r => r.id !== id)));
     return true;
   }
 
-  const { error } = await supabaseClient
-    .from("kayitlar")
-    .delete()
-    .eq("id", id);
+  const { error } = await supabaseClient.from("kayitlar").delete().eq("id", id);
 
   if (error) {
     alert("Silinemedi: " + error.message);
@@ -211,7 +213,7 @@ function rowCells(page, row) {
       money(row.toplam_satis),
       money(c.kdv_farki),
       money(c.kdv_dahil_toplam),
-      `<b class="profit">${money(c.kar)}</b>`,
+      `<b class="${c.kar >= 0 ? "profit" : "loss"}">${money(c.kar)}</b>`,
       badge(row.durum),
       badge(row.odeme_durumu),
       badge(row.fatura_durumu),
@@ -241,126 +243,216 @@ function rowCells(page, row) {
     row.adet,
     money(row.toplam_maliyet),
     money(row.toplam_satis),
-    `<b class="profit">${money(c.kar)}</b>`,
+    `<b class="${c.kar >= 0 ? "profit" : "loss"}">${money(c.kar)}</b>`,
     badge(row.durum),
     badge(row.odeme_durumu),
     row.notlar || ""
   ];
 }
 
-function summaryHtml(page, rows) {
-  let totalCost = 0;
-  let totalSale = 0;
-  let totalVat = 0;
-  let totalProfit = 0;
-  let totalInvoice = 0;
-  let totalReceivable = 0;
-  let totalDebt = 0;
+function applyFilters(page, rows, filters) {
+  return rows.filter(row => {
+    const q = filters.search.toLowerCase().trim();
+    const selectedMonth = filters.month;
+    const selectedPayment = filters.payment;
+    const onlyUnpaid = filters.onlyUnpaid;
 
-  rows.forEach(r => {
-    const c = calculate(r);
+    const nameKey = PAGE_CONFIG[page].nameKey;
+    const name = String(row[nameKey] || "").toLowerCase();
+    const fullText = JSON.stringify(row).toLowerCase();
 
-    totalCost += Number(r.toplam_maliyet || r.toplam_tutar || 0);
-    totalSale += Number(r.toplam_satis || 0);
-    totalVat += Number(c.kdv_farki || 0);
-    totalProfit += Number(c.kar || 0);
-    totalInvoice += Number(c.kdv_dahil_toplam || 0);
+    const searchMatch = !q || name.includes(q) || fullText.includes(q);
+    const rowMonth = row.tarih ? String(row.tarih).slice(5, 7) : "";
+    const monthMatch = !selectedMonth || rowMonth === selectedMonth;
+    const paymentMatch = !selectedPayment || row.odeme_durumu === selectedPayment;
+    const unpaidMatch = !onlyUnpaid || isUnpaid(row);
 
-    const unpaid =
-      r.odeme_durumu === "Bekleniyor" ||
-      r.odeme_durumu === "Ödenmedi" ||
-      r.odeme_durumu === "Kısmi Ödeme";
+    return searchMatch && monthMatch && paymentMatch && unpaidMatch;
+  });
+}
 
-    if (unpaid && page === "faturali") {
-      totalReceivable += Number(c.kdv_dahil_toplam || 0);
+function totalsFor(page, rows) {
+  const t = {
+    count: rows.length,
+    cost: 0,
+    sale: 0,
+    profit: 0,
+    vat: 0,
+    vatIncluded: 0,
+    receivable: 0,
+    debt: 0
+  };
+
+  rows.forEach(row => {
+    const c = calculate(row);
+
+    if (page === "gelen") {
+      t.cost += Number(row.toplam_tutar || 0);
+      t.vat += c.kdv_farki;
+      t.vatIncluded += c.kdv_dahil_toplam;
+      if (isUnpaid(row)) t.debt += c.kdv_dahil_toplam;
+      return;
     }
 
-    if (unpaid && page === "faturasiz") {
-      totalReceivable += Number(r.toplam_satis || 0);
+    t.cost += Number(row.toplam_maliyet || 0);
+    t.sale += Number(row.toplam_satis || 0);
+    t.profit += c.kar;
+
+    if (page === "faturali") {
+      t.vat += c.kdv_farki;
+      t.vatIncluded += c.kdv_dahil_toplam;
+      if (isUnpaid(row)) t.receivable += c.kdv_dahil_toplam;
     }
 
-    if (unpaid && page === "gelen") {
-      totalDebt += Number(c.kdv_dahil_toplam || 0);
+    if (page === "faturasiz") {
+      if (isUnpaid(row)) t.receivable += Number(row.toplam_satis || 0);
     }
   });
+
+  return t;
+}
+
+function vatPanelHtml(selectedMonth) {
+  const faturaliRows = selectedMonth
+    ? PAGE_ROWS.faturali.filter(r => r.tarih && r.tarih.slice(5, 7) === selectedMonth)
+    : PAGE_ROWS.faturali;
+
+  const gelenRows = selectedMonth
+    ? PAGE_ROWS.gelen.filter(r => r.tarih && r.tarih.slice(5, 7) === selectedMonth)
+    : PAGE_ROWS.gelen;
+
+  const faturasizRows = selectedMonth
+    ? PAGE_ROWS.faturasiz.filter(r => r.tarih && r.tarih.slice(5, 7) === selectedMonth)
+    : PAGE_ROWS.faturasiz;
+
+  const faturaliTotal = totalsFor("faturali", faturaliRows);
+  const gelenTotal = totalsFor("gelen", gelenRows);
+  const faturasizTotal = totalsFor("faturasiz", faturasizRows);
+
+  const payableVat = faturaliTotal.vat - gelenTotal.vat;
+  const monthName = selectedMonth
+    ? MONTHS.find(m => m[0] === selectedMonth)?.[1]
+    : "Tüm Aylar";
+
+  return `
+    <div class="kdv-panel">
+      <div class="kdv-title">
+        <strong>${monthName} KDV ve Genel Durum</strong>
+        <span>Faturalı sipariş KDV - Gelen fatura KDV = Ödenecek KDV</span>
+      </div>
+
+      <div class="summary mini">
+        <div class="sum-item">
+          <small>Alınan KDV</small>
+          <strong>${money(faturaliTotal.vat)}</strong>
+        </div>
+        <div class="sum-item">
+          <small>Ödenen KDV</small>
+          <strong>${money(gelenTotal.vat)}</strong>
+        </div>
+        <div class="sum-item">
+          <small>Devlete Ödenecek KDV</small>
+          <strong class="${payableVat >= 0 ? "loss" : "profit"}">${money(payableVat)}</strong>
+        </div>
+        <div class="sum-item">
+          <small>Faturalı Kâr</small>
+          <strong>${money(faturaliTotal.profit)}</strong>
+        </div>
+        <div class="sum-item">
+          <small>Faturasız Kâr</small>
+          <strong>${money(faturasizTotal.profit)}</strong>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function customerDebtHtml(page, rows) {
+  const config = PAGE_CONFIG[page];
+  const nameKey = config.nameKey;
+  const map = {};
+
+  rows.forEach(row => {
+    if (!isUnpaid(row)) return;
+
+    const name = row[nameKey] || "İsimsiz";
+    const c = calculate(row);
+
+    if (!map[name]) map[name] = 0;
+
+    if (page === "faturali") map[name] += c.kdv_dahil_toplam;
+    if (page === "faturasiz") map[name] += Number(row.toplam_satis || 0);
+    if (page === "gelen") map[name] += c.kdv_dahil_toplam;
+  });
+
+  const list = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  if (!list.length) return "";
+
+  const title = page === "gelen" ? "Firma Bazlı Borç Özeti" : "Müşteri Bazlı Alacak Özeti";
+
+  return `
+    <div class="cari-card">
+      <h3>${title}</h3>
+      ${list.map(([name, total]) => `
+        <div class="cari-row">
+          <span>${name}</span>
+          <strong>${money(total)}</strong>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function summaryHtml(page, rows, selectedMonth) {
+  const t = totalsFor(page, rows);
 
   let items = [];
 
-  if (page === "gelen") {
+  if (page === "faturali") {
     items = [
-      ["Toplam Tutar", totalCost],
-      ["KDV Farkı", totalVat],
-      ["KDV Dahil Toplam", totalInvoice],
-      ["Toplam Borç", totalDebt],
-      ["Toplam Kayıt", rows.length]
-    ];
-  } else if (page === "faturali") {
-    items = [
-      ["Toplam Maliyet", totalCost],
-      ["Toplam Satış", totalSale],
-      ["Toplam Kâr", totalProfit],
-      ["KDV Farkı", totalVat],
-      ["Toplam Alacak", totalReceivable],
-      ["Toplam Kayıt", rows.length]
-    ];
-  } else {
-    items = [
-      ["Toplam Maliyet", totalCost],
-      ["Toplam Satış", totalSale],
-      ["Toplam Kâr", totalProfit],
-      ["Toplam Alacak", totalReceivable],
-      ["Toplam Kayıt", rows.length]
+      ["Toplam Maliyet", t.cost],
+      ["Toplam Satış", t.sale],
+      ["KDV Dahil Toplam", t.vatIncluded],
+      ["Toplam Kâr", t.profit],
+      ["KDV Farkı", t.vat],
+      ["Toplam Alacak", t.receivable],
+      ["Kayıt", t.count]
     ];
   }
 
-  return `<div class="summary">
-    ${items.map(([label, value]) => `
-      <div class="sum-item">
-        <small>${label}</small>
-        <strong>${label === "Toplam Kayıt" ? value : money(value)}</strong>
-      </div>
-    `).join("")}
-  </div>`;
-}
-  let totalCost = 0;
-  let totalSale = 0;
-  let totalVat = 0;
-  let totalProfit = 0;
-  let totalInvoice = 0;
+  if (page === "faturasiz") {
+    items = [
+      ["Toplam Maliyet", t.cost],
+      ["Toplam Satış", t.sale],
+      ["Toplam Kâr", t.profit],
+      ["Toplam Alacak", t.receivable],
+      ["Kayıt", t.count]
+    ];
+  }
 
-  rows.forEach(r => {
-    const c = calculate(r);
+  if (page === "gelen") {
+    items = [
+      ["Toplam Tutar", t.cost],
+      ["KDV Dahil Toplam", t.vatIncluded],
+      ["KDV Farkı", t.vat],
+      ["Toplam Borç", t.debt],
+      ["Kayıt", t.count]
+    ];
+  }
 
-    totalCost += Number(r.toplam_maliyet || r.toplam_tutar || 0);
-    totalSale += Number(r.toplam_satis || 0);
-    totalVat += Number(c.kdv_farki || 0);
-    totalProfit += Number(c.kar || 0);
-    totalInvoice += Number(c.kdv_dahil_toplam || 0);
-  });
-
-  const items = page === "gelen"
-    ? [
-        ["Toplam Tutar", totalCost],
-        ["KDV Farkı", totalVat],
-        ["KDV Dahil Toplam", totalInvoice],
-        ["Toplam Kayıt", rows.length]
-      ]
-    : [
-        ["Toplam Maliyet", totalCost],
-        ["Toplam Satış", totalSale],
-        ["Toplam Kâr", totalProfit],
-        ["KDV Farkı", totalVat],
-        ["Toplam Kayıt", rows.length]
-      ];
-
-  return `<div class="summary">
-    ${items.map(([label, value]) => `
-      <div class="sum-item">
-        <small>${label}</small>
-        <strong>${label === "Toplam Kayıt" ? value : money(value)}</strong>
-      </div>
-    `).join("")}
-  </div>`;
+  return `
+    ${vatPanelHtml(selectedMonth)}
+    <div class="summary">
+      ${items.map(([label, value]) => `
+        <div class="sum-item">
+          <small>${label}</small>
+          <strong>${label === "Kayıt" ? value : money(value)}</strong>
+        </div>
+      `).join("")}
+    </div>
+    ${customerDebtHtml(page, rows)}
+  `;
 }
 
 function fieldHtml(field) {
@@ -396,9 +488,12 @@ function openModal(container, config, row = null) {
 
   config.fields.forEach(([name, , type]) => {
     const input = modal.querySelector(`[name="${name}"]`);
+    if (!input) return;
 
     if (name === "kdv_orani") {
       input.value = row?.kdv_orani || "20";
+    } else if (name === "odeme_durumu") {
+      input.value = row?.odeme_durumu || (config.page === "gelen" ? "Ödenmedi" : "Bekleniyor");
     } else {
       input.value = row?.[name] ?? (type === "date" ? today() : "");
     }
@@ -427,7 +522,6 @@ function exportCsv(config, rows) {
 
   const body = rows.map(row =>
     rowCells(config.page, row)
-      .slice(0, -1)
       .map(cell => String(cell ?? "").replace(/<[^>]+>/g, "").replaceAll(";", ","))
       .join(";")
   );
@@ -440,48 +534,51 @@ function exportCsv(config, rows) {
   a.click();
 }
 
+function monthOptionsHtml() {
+  return `
+    <option value="">Tüm Aylar</option>
+    ${MONTHS.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}
+  `;
+}
+
+function paymentOptionsHtml(page) {
+  const options = page === "gelen"
+    ? ["Ödendi", "Ödenmedi"]
+    : ["Ödendi", "Bekleniyor", "Kısmi Ödeme"];
+
+  return `
+    <option value="">Tüm Ödemeler</option>
+    ${options.map(x => `<option value="${x}">${x}</option>`).join("")}
+  `;
+}
+
 async function renderPage(page) {
   const config = PAGE_CONFIG[page];
   const container = document.querySelector("#page-" + page);
-  let rows = await loadRows(page);
+
+  PAGE_ROWS[page] = await loadRows(page);
+  let rows = PAGE_ROWS[page];
 
   container.innerHTML = `
     <div class="page-head">
       <h1>${config.title}</h1>
       <div class="tools">
-      <select class="month-filter">
-  <option value="">Tüm Aylar</option>
-  <option value="01">Ocak</option>
-  <option value="02">Şubat</option>
-  <option value="03">Mart</option>
-  <option value="04">Nisan</option>
-  <option value="05">Mayıs</option>
-  <option value="06">Haziran</option>
-  <option value="07">Temmuz</option>
-  <option value="08">Ağustos</option>
-  <option value="09">Eylül</option>
-  <option value="10">Ekim</option>
-  <option value="11">Kasım</option>
-  <option value="12">Aralık</option>
-</select>
+        <input class="search" placeholder="${page === "gelen" ? "Firma adı ara..." : "Müşteri adı ara..."}" />
 
-<select class="payment-filter">
-  <option value="">Tüm Ödemeler</option>
-  <option value="Ödendi">Ödendi</option>
-  <option value="Bekleniyor">Bekleniyor</option>
-  <option value="Ödenmedi">Ödenmedi</option>
-  <option value="Kısmi Ödeme">Kısmi Ödeme</option>
-</select>
+        <select class="month-filter">${monthOptionsHtml()}</select>
+        <select class="payment-filter">${paymentOptionsHtml(page)}</select>
 
-<label class="only-unpaid-wrap">
-  <input type="checkbox" class="only-unpaid" />
-  Ödenmeyenleri Göster
-</label>
-        <button class="btn btn-red add-btn">+ Yeni Kayıt Ekle</button>
+        <label class="only-unpaid-wrap">
+          <input type="checkbox" class="only-unpaid" />
+          Ödenmeyenleri Göster
+        </label>
+
+        <button class="btn btn-red add-btn">+ Yeni Kayıt</button>
         <button class="btn btn-light export-btn">Excel'e Aktar</button>
-        <input class="search" placeholder="Ara..." />
       </div>
     </div>
+
+    <div class="summary-wrap"></div>
 
     <div class="card table-wrap">
       <table>
@@ -492,16 +589,10 @@ async function renderPage(page) {
       </table>
     </div>
 
-    <div class="summary-wrap"></div>
-
     <div class="modal">
       <div class="modal-box">
         <h2 class="modal-title">Yeni Kayıt Ekle</h2>
-
-        <div class="form-grid">
-          ${config.fields.map(fieldHtml).join("")}
-        </div>
-
+        <div class="form-grid">${config.fields.map(fieldHtml).join("")}</div>
         <div class="modal-actions">
           <button class="btn btn-light close-btn">Vazgeç</button>
           <button class="btn btn-red save-btn">Kaydet</button>
@@ -514,32 +605,21 @@ async function renderPage(page) {
   const summary = container.querySelector(".summary-wrap");
   const search = container.querySelector(".search");
   const monthFilter = container.querySelector(".month-filter");
-const paymentFilter = container.querySelector(".payment-filter");
-const onlyUnpaid = container.querySelector(".only-unpaid");
+  const paymentFilter = container.querySelector(".payment-filter");
+  const onlyUnpaid = container.querySelector(".only-unpaid");
+
+  function currentFilters() {
+    return {
+      search: search.value || "",
+      month: monthFilter.value || "",
+      payment: paymentFilter.value || "",
+      onlyUnpaid: onlyUnpaid.checked
+    };
+  }
 
   function draw() {
-    const q = search.value.toLowerCase().trim();
-
-    const selectedMonth = monthFilter.value;
-const selectedPayment = paymentFilter.value;
-const showOnlyUnpaid = onlyUnpaid.checked;
-
-const filtered = rows.filter(r => {
-  const textMatch = JSON.stringify(r).toLowerCase().includes(q);
-
-  const rowMonth = r.tarih ? r.tarih.slice(5, 7) : "";
-  const monthMatch = !selectedMonth || rowMonth === selectedMonth;
-
-  const paymentMatch = !selectedPayment || r.odeme_durumu === selectedPayment;
-
-  const unpaidMatch =
-    !showOnlyUnpaid ||
-    r.odeme_durumu === "Bekleniyor" ||
-    r.odeme_durumu === "Ödenmedi" ||
-    r.odeme_durumu === "Kısmi Ödeme";
-
-  return textMatch && monthMatch && paymentMatch && unpaidMatch;
-});
+    const filters = currentFilters();
+    const filtered = applyFilters(page, rows, filters);
 
     tbody.innerHTML = filtered.map(row => `
       <tr>
@@ -553,18 +633,19 @@ const filtered = rows.filter(r => {
       </tr>
     `).join("");
 
-    summary.innerHTML = summaryHtml(page, filtered);
+    summary.innerHTML = summaryHtml(page, filtered, filters.month);
   }
 
   draw();
 
   container.querySelector(".add-btn").onclick = () => openModal(container, config);
   container.querySelector(".close-btn").onclick = () => closeModal(container);
-  container.querySelector(".export-btn").onclick = () => exportCsv(config, rows);
+  container.querySelector(".export-btn").onclick = () => exportCsv(config, applyFilters(page, rows, currentFilters()));
+
   search.oninput = draw;
   monthFilter.onchange = draw;
-paymentFilter.onchange = draw;
-onlyUnpaid.onchange = draw;
+  paymentFilter.onchange = draw;
+  onlyUnpaid.onchange = draw;
 
   container.querySelector(".save-btn").onclick = async () => {
     const obj = getFormValues(container, config);
@@ -574,8 +655,18 @@ onlyUnpaid.onchange = draw;
     if (!ok) return;
 
     rows = await loadRows(page);
+    PAGE_ROWS[page] = rows;
     closeModal(container);
     draw();
+
+    Object.keys(PAGE_CONFIG).forEach(p => {
+      if (p !== page) {
+        const el = document.querySelector("#page-" + p);
+        if (el && el.innerHTML) {
+          renderPage(p);
+        }
+      }
+    });
   };
 
   tbody.onclick = async event => {
@@ -592,6 +683,7 @@ onlyUnpaid.onchange = draw;
       if (!ok) return;
 
       rows = await loadRows(page);
+      PAGE_ROWS[page] = rows;
       draw();
     }
   };
@@ -607,4 +699,10 @@ document.querySelectorAll(".nav").forEach(button => {
   };
 });
 
-Object.keys(PAGE_CONFIG).forEach(renderPage);
+(async function init() {
+  await Promise.all(Object.keys(PAGE_CONFIG).map(async page => {
+    PAGE_ROWS[page] = await loadRows(page);
+  }));
+
+  Object.keys(PAGE_CONFIG).forEach(renderPage);
+})();
