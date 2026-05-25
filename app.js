@@ -73,4 +73,21 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 function calculate(row) {
   const cost = Number(row.toplam_maliyet || 0);
+  const sale = Number(row.toplam_satis || 0);
+  const total = Number(row.toplam_tutar || 0);
+  const base = sale || total;
+
+  const rate = Number(row.kdv_orani || 0);
+  const vat = rate ? base * rate / 100 : Number(row.kdv_farki || 0);
+
+  return {
+    kar: sale - cost,
+    kdv_farki: vat,
+    kdv_dahil_toplam: base + vat
+  };
+}
+
+function cleanRowForDb(page, obj) {
+  const c = calculate(obj);
+
 })();
