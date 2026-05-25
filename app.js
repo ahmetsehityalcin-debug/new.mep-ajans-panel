@@ -444,6 +444,30 @@ async function renderPage(page) {
   const config = PAGE_CONFIG[page];
   const container = document.querySelector("#page-" + page);
   let rows = await loadRows(page);
+  const monthFilter = document.querySelector(`#month-filter-${page}`);
+const paymentFilter = document.querySelector(`#payment-filter-${page}`);
+const customerFilter = document.querySelector(`#customer-filter-${page}`);
+
+if (monthFilter?.value) {
+  rows = rows.filter(r => {
+    const rowMonth = new Date(r.tarih).getMonth() + 1;
+    return rowMonth == monthFilter.value;
+  });
+}
+
+if (paymentFilter?.value === "odenmedi") {
+  rows = rows.filter(r =>
+    r.odeme_durumu === "Bekleniyor"
+  );
+}
+
+if (customerFilter?.value) {
+  rows = rows.filter(r =>
+    (r.musteri || r.firma || "")
+      .toLowerCase()
+      .includes(customerFilter.value.toLowerCase())
+  );
+}
 
   container.innerHTML = `
     <div class="page-head">
