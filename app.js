@@ -254,6 +254,7 @@ function applyFilters(page, rows, filters) {
   return rows.filter(row => {
     const q = filters.search.toLowerCase().trim();
     const selectedMonth = filters.month;
+    const selectedYear = filters.year;
     const selectedPayment = filters.payment;
     const onlyUnpaid = filters.onlyUnpaid;
 
@@ -263,11 +264,14 @@ function applyFilters(page, rows, filters) {
 
     const searchMatch = !q || name.includes(q) || fullText.includes(q);
     const rowMonth = row.tarih ? String(row.tarih).slice(5, 7) : "";
+    const rowYear = row.tarih ? String(row.tarih).slice(0, 4) : "";
+
     const monthMatch = !selectedMonth || rowMonth === selectedMonth;
+    const yearMatch = !selectedYear || rowYear === selectedYear;
     const paymentMatch = !selectedPayment || row.odeme_durumu === selectedPayment;
     const unpaidMatch = !onlyUnpaid || isUnpaid(row);
 
-    return searchMatch && monthMatch && paymentMatch && unpaidMatch;
+    return searchMatch && monthMatch && yearMatch && paymentMatch && unpaidMatch;
   });
 }
 
@@ -312,32 +316,37 @@ function totalsFor(page, rows) {
   return t;
 }
 
-function vatPanelHtml(selectedMonth) {
-  const faturaliRows = selectedMonth
-    ? PAGE_ROWS.faturali.filter(r => r.tarih && r.tarih.slice(5, 7) === selectedMonth)
-    : PAGE_ROWS.faturali;
+function vatPanelHtml(selectedMonth, selectedYear) {
+  const filterByDate = row => {
+    const rowMonth = row.tarih ? String(row.tarih).slice(5, 7) : "";
+    const rowYear = row.tarih ? String(row.tarih).slice(0, 4) : "";
 
-  const gelenRows = selectedMonth
-    ? PAGE_ROWS.gelen.filter(r => r.tarih && r.tarih.slice(5, 7) === selectedMonth)
-    : PAGE_ROWS.gelen;
+    const monthMatch = !selectedMonth || rowMonth === selectedMonth;
+    const yearMatch = !selectedYear || rowYear === selectedYear;
 
-  const faturasizRows = selectedMonth
-    ? PAGE_ROWS.faturasiz.filter(r => r.tarih && r.tarih.slice(5, 7) === selectedMonth)
-    : PAGE_ROWS.faturasiz;
+    return monthMatch && yearMatch;
+  };
+
+  const faturaliRows = PAGE_ROWS.faturali.filter(filterByDate);
+  const gelenRows = PAGE_ROWS.gelen.filter(filterByDate);
+  const faturasizRows = PAGE_ROWS.faturasiz.filter(filterByDate);
 
   const faturaliTotal = totalsFor("faturali", faturaliRows);
   const gelenTotal = totalsFor("gelen", gelenRows);
   const faturasizTotal = totalsFor("faturasiz", faturasizRows);
 
   const payableVat = faturaliTotal.vat - gelenTotal.vat;
+
   const monthName = selectedMonth
     ? MONTHS.find(m => m[0] === selectedMonth)?.[1]
     : "Tüm Aylar";
 
+  const title = `${selectedYear || "Tüm Yıllar"} / ${monthName}`;
+
   return `
     <div class="kdv-panel">
       <div class="kdv-title">
-        <strong>${monthName} KDV ve Genel Durum</strong>
+        <strong>${title} KDV ve Genel Durum</strong>
         <span>Faturalı sipariş KDV - Gelen fatura KDV = Ödenecek KDV</span>
       </div>
 
@@ -404,7 +413,7 @@ function customerDebtHtml(page, rows) {
   `;
 }
 
-function summaryHtml(page, rows, selectedMonth) {
+function summaryHtml(page, rows, selectedMonth, selectedYear) {
   const t = totalsFor(page, rows);
 
   let items = [];
@@ -442,7 +451,7 @@ function summaryHtml(page, rows, selectedMonth) {
   }
 
   return `
-    ${vatPanelHtml(selectedMonth)}
+    ${vatPanelHtml(selectedMonth, selectedYear)}
     <div class="summary">
       ${items.map(([label, value]) => `
         <div class="sum-item">
@@ -541,6 +550,19 @@ function monthOptionsHtml() {
   `;
 }
 
+function yearOptionsHtml(rows) {
+  const years = [...new Set(
+    rows
+      .map(r => r.tarih ? String(r.tarih).slice(0, 4) : "")
+      .filter(Boolean)
+  )].sort((a, b) => b.localeCompare(a));
+
+  return `
+    <option value="">Tüm Yıllar</option>
+    ${years.map(year => `<option value="${year}">${year}</option>`).join("")}
+  `;
+}
+
 function paymentOptionsHtml(page) {
   const options = page === "gelen"
     ? ["Ödendi", "Ödenmedi"]
@@ -566,6 +588,7 @@ async function renderPage(page) {
         <input class="search" placeholder="${page === "gelen" ? "Firma adı ara..." : "Müşteri adı ara..."}" />
 
         <select class="month-filter">${monthOptionsHtml()}</select>
+        <select class="year-filter">${yearOptionsHtml(rows)}</select>
         <select class="payment-filter">${paymentOptionsHtml(page)}</select>
 
         <label class="only-unpaid-wrap">
@@ -605,6 +628,7 @@ async function renderPage(page) {
   const summary = container.querySelector(".summary-wrap");
   const search = container.querySelector(".search");
   const monthFilter = container.querySelector(".month-filter");
+  const yearFilter = container.querySelector(".year-filter");
   const paymentFilter = container.querySelector(".payment-filter");
   const onlyUnpaid = container.querySelector(".only-unpaid");
 
@@ -612,6 +636,7 @@ async function renderPage(page) {
     return {
       search: search.value || "",
       month: monthFilter.value || "",
+      year: yearFilter.value || "",
       payment: paymentFilter.value || "",
       onlyUnpaid: onlyUnpaid.checked
     };
@@ -633,7 +658,7 @@ async function renderPage(page) {
       </tr>
     `).join("");
 
-    summary.innerHTML = summaryHtml(page, filtered, filters.month);
+    summary.innerHTML = summaryHtml(page, filtered, filters.month, filters.year);
   }
 
   draw();
@@ -644,6 +669,7 @@ async function renderPage(page) {
 
   search.oninput = draw;
   monthFilter.onchange = draw;
+  yearFilter.onchange = draw;
   paymentFilter.onchange = draw;
   onlyUnpaid.onchange = draw;
 
